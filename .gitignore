@@ -11,10 +11,11 @@ Client/node_modules
 Server/node_modules
 Server/.env
 Client/.env
+Server/chat.db
 node_modules
-dist
-dist-ssr
-*.local
+Server/dist
+Client/dist
+Client/dist-ssr
 Client/.react-router
 
 # Editor directories and files

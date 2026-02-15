@@ -30,15 +30,45 @@ app.use("/api/auth", toNodeHandler(auth))
 
 app.use(express.json())
 
+app.get("/api/rooms", async (req, res) => {
+    const session = await auth.api.getSession({ headers: req.headers as any })
+    if(!session) return res.status(401).json({ error: "Unauthorized" })
+
+    const rooms = await db.select().from(room)
+
+    res.json(rooms)
+})
+
+app.get("/api/rooms/:roomId", async (req, res) =>{
+    const session = await auth.api.getSession({ headers: req.headers as any })
+    if(!session) return res.status(401).json({ error: "Unauthorized" })
+
+    const roomData = await db.select().from(room).where(eq(room.id, req.params.roomId))
+
+    res.json(roomData)
+})
+
 app.get("/api/rooms/:roomId/messages", async (req, res) => {
     const session = await auth.api.getSession({ headers: req.headers as any })
     if(!session) return res.status(401).json({ error: "Unauthorized" })
 
-    const messages = await db.query.message.findMany({
-        where: eq(message.roomId, req.params.roomId),
-        with: { user: { columns: {name: true} } },
-        orderBy: (m, {asc}) => [asc(m.createdAt)],
-    })
+    const messages = await db.select({
+        id: message.id,
+        roomId: message.roomId,
+        userId: message.userId,
+        content: message.content,
+        createdAt: message.createdAt,
+        sender: user.name
+    }).from(message)
+        .innerJoin(user, eq(message.userId, user.id))
+        .where(eq(message.roomId, req.params.roomId))
+        .orderBy(message.createdAt)
+
+    // const messages = await db.query.message.findMany({
+    //     where: eq(message.roomId, req.params.roomId),
+    //     with: { user: { columns: {name: true} } },
+    //     orderBy: (m, {asc}) => [asc(m.createdAt)],
+    // })
 
     res.json(messages)
 })

@@ -103,6 +103,7 @@ export const message = sqliteTable("message", {
     roomId: text("room_id").notNull().references(() => room.id, {onDelete: "cascade"}),
     userId: text("user_id").notNull().references(() => user.id, {onDelete: "cascade"}),
     createdAt: integer("created_at", {mode: "timestamp"}).notNull(),
+    deletedAt: integer("deleted_at", {mode: "timestamp"}),
 })
 
 export const userRelations = relations(user, ({ many }) => ({

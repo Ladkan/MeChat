@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react"
-import { socket } from "~/lib/socket"
+import { useEffect, useRef, useState } from "react";
+import { useSession } from "~/lib/auth-client";
+import { socket } from "~/lib/socket";
 
 interface ChatProps {
   roomId: string | null;
-  currentUserId?: string;
 }
 
 type Message = {
@@ -11,7 +11,8 @@ type Message = {
   sender: string;
   content: string;
   createdAt: string;
-}
+  deletedAt: string | null;
+};
 
 const SENDER_COLORS = [
   "text-[#47c8ff]",
@@ -20,94 +21,129 @@ const SENDER_COLORS = [
   "text-[#ff8e53]",
   "text-[#e8ff47]",
   "text-[#f64f59]",
-]
+];
 
 function senderColor(name: string) {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  return SENDER_COLORS[Math.abs(hash) % SENDER_COLORS.length]
+  let hash = 0;
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return SENDER_COLORS[Math.abs(hash) % SENDER_COLORS.length];
 }
 
 function formatTime(iso: string) {
+  const today = new Date();
 
-  const today = new Date
+  if (today.getDate() !== new Date(iso).getDate())
+    return new Date(iso).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      day: "2-digit",
+      month: "2-digit",
+    });
 
-  if(today.getDate() !== new Date(iso).getDate() )
-    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", day: '2-digit', month: '2-digit' })
-
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  return new Date(iso).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-export function Chat({ roomId, currentUserId }: ChatProps) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState("")
-  const [isTyping, setIsTyping] = useState<string | null>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const [roomName, setRoomName] = useState("")
-  const inputRef = useRef<HTMLInputElement>(null)
+export function Chat({ roomId }: ChatProps) {
+  const { data: session } = useSession();
+  const currentUser = session?.user.name;
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isTyping, setIsTyping] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const [roomName, setRoomName] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if(!roomId) return
+    if (!roomId) return;
 
     fetch(`http://localhost:8000/api/rooms/${roomId}`, {
-      credentials: "include"
+      credentials: "include",
     })
       .then((r) => r.json())
-      .then((r) => setRoomName(r[0].name))
+      .then((r) => setRoomName(r[0].name));
 
-    inputRef.current?.focus()
-  },[roomId])
+    inputRef.current?.focus();
+  }, [roomId]);
 
   useEffect(() => {
-    if (!roomId) return
+    if (!roomId) return;
 
-    setMessages([])
+    setMessages([]);
 
-    socket.connect()
+    socket.connect();
 
-    socket.on("connect", () => {
-      socket.emit("join_room", roomId)
-    })
+    socket.emit("leave_room", roomId)
+    socket.emit("join_room", roomId)
 
     fetch(`http://localhost:8000/api/rooms/${roomId}/messages`, {
       credentials: "include",
     })
       .then((r) => r.json())
-      .then((data) => setMessages(data))
+      .then((data) => setMessages(data));
 
     socket.on("receive_message", (msg: Message) => {
-      setMessages((prev) => [...prev, msg])
-    })
+      setMessages((prev) => [...prev, msg]);
+    });
 
     socket.on("user_typing", ({ name }: { name: string }) => {
-      setIsTyping(name)
-      setTimeout(() => setIsTyping(null), 2000)
-    })
+      setIsTyping(name);
+      setTimeout(() => setIsTyping(null), 2000);
+    });
+
+    socket.on("message_deleted", ({ messageId }: { messageId: string }) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                content: "[Deleted by user]",
+                deletedAt: new Date().toISOString(),
+              }
+            : m,
+        ),
+      );
+    });
 
     return () => {
-      socket.off("receive_message")
-      socket.off("user_typing")
-      socket.disconnect()
-    }
-  }, [roomId])
+      socket.off("receive_message");
+      socket.off("user_typing");
+      socket.off("message_deleted");
+      socket.disconnect();
+    };
+  }, [roomId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
 
   const sendMessage = () => {
-    if (!input.trim()) return
+    if (!input.trim()) return;
 
-    console.log("Socket connected:", socket.connected)
+    console.log("Socket connected:", socket.connected);
 
-    socket.emit("send_message", { roomId: roomId, content: input })
-    setInput("")
-  }
+    socket.emit("send_message", { roomId: roomId, content: input });
+    setInput("");
+  };
 
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value)
-    socket.emit("typing", { roomId: roomId })
-  }
+    setInput(e.target.value);
+    socket.emit("typing", { roomId: roomId });
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    const res = await fetch(
+      `http://localhost:8000/api/messages/${messageId}`,
+      {
+        method: "PATCH",
+        credentials: "include",
+      },
+    );
+    if (!res.ok) console.error("Faild to delete message.");
+  };
 
   if (!roomId) {
     return (
@@ -133,19 +169,20 @@ export function Chat({ roomId, currentUserId }: ChatProps) {
           </p>
         </div>
       </div>
-    )
+    );
   }
 
-  return(
+  return (
     <div className="flex-1 flex flex-col bg-[#13161b] border border-[#232830] rounded-2xl overflow-hidden min-w-0">
-
       <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[#232830] shrink-0">
         <div className="w-8 h-8 rounded-lg bg-[#e8ff47]/10 flex items-center justify-center shrink-0">
           <span className="text-[14px] font-black text-[#e8ff47]">#</span>
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-[14px] font-bold text-[#eef0f4] leading-none truncate"
-            style={{ fontFamily: "'Syne', sans-serif" }}>
+          <h2
+            className="text-[14px] font-bold text-[#eef0f4] leading-none truncate"
+            style={{ fontFamily: "'Syne', sans-serif" }}
+          >
             {roomName || roomId}
           </h2>
           <p className="text-[11px] text-[#4e5668] mt-0.5">
@@ -154,8 +191,16 @@ export function Chat({ roomId, currentUserId }: ChatProps) {
           </p>
         </div>
         <button className="w-8 h-8 rounded-lg text-[#4e5668] hover:text-[#a0a8b8] hover:bg-[#1a1e25] flex items-center justify-center transition-all">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
           </svg>
         </button>
       </div>
@@ -163,50 +208,95 @@ export function Chat({ roomId, currentUserId }: ChatProps) {
       <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3 [&::-webkit-scrollbar]:w-0.75 [&::-webkit-scrollbar-thumb]:bg-[#232830] [&::-webkit-scrollbar-thumb]:rounded-full">
         {messages.length === 0 && (
           <div className="flex-1 flex items-center justify-center">
-            <p className="text-xs text-[#4e5668]">No messages yet — say hello! 👋</p>
+            <p className="text-xs text-[#4e5668]">
+              No messages yet — say hello! 👋
+            </p>
           </div>
         )}
 
         {messages.map((m, i) => {
-          const isMe = m.sender === currentUserId
-          const showSender = !isMe && (i === 0 || messages[i - 1]?.sender !== m.sender)
+          const isMe = m.sender === currentUser
+          const showSender =
+            !isMe && (i === 0 || messages[i - 1]?.sender !== m.sender)
           const color = senderColor(m.sender)
-
+          const isDeleted =!! m.deletedAt
+          console.log(isDeleted)
           return (
-            <div key={m.id} className={`flex gap-2.5 items-end ${isMe ? "flex-row-reverse" : ""}`}>
-
-              <div className={`flex flex-col gap-0.5 max-w-[62%] ${isMe ? "items-end" : "items-start"}`}>
-                {showSender && !isMe && (
+            <div
+              key={m.id}
+              className={`flex gap-2.5 items-end ${isMe ? "flex-row-reverse" : ""}`}
+            >
+              <div
+                className={`group flex flex-col gap-0.5 max-w-[62%] ${isMe ? "items-end" : "items-start"}`}
+              >
+                {showSender && !isMe && !isDeleted && (
                   <span className={`text-[11px] font-semibold px-1 ${color}`}>
                     {m.sender}
                   </span>
                 )}
 
-                <div className={`px-3.5 py-2 rounded-2xl text-[13.5px] leading-relaxed wrap-break-word ${
-                  isMe
-                    ? "bg-[#e8ff47] text-[#0d0f12] font-medium rounded-br-sm"
-                    : "bg-[#1e2330] text-[#eef0f4] rounded-bl-sm"
-                }`}>
-                  {m.content}
+                <div
+                  className={`flex items-center gap-1.5 ${isMe ? "flex-row-reverse" : ""}`}
+                >
+                  <div
+                    className={`px-3.5 py-2 rounded-2xl text-[13.5px] leading-relaxed wrap-break-word ${
+                      isDeleted
+                        ? "bg-transparent border border-[#232830] text-[#4e5668] italic text-[12px]"
+                        : isMe
+                          ? "bg-[#e8ff47] text-[#0d0f12] font-medium rounded-br-sm"
+                          : "bg-[#1e2330] text-[#eef0f4] rounded-bl-sm"
+                    }`}
+                  >
+                    {m.content}
+                  </div>
+                  {isMe && !isDeleted && (
+                    <button
+                      onClick={() => deleteMessage(m.id)}
+                      className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-lg bg-[#1a1e25] border border-[#232830] text-[#4e5668] hover:text-[#ff6b6b] hover:border-[#ff6b6b]/30 hover:bg-[#ff6b6b]/10 flex items-center justify-center transition-all duration-150 shrink-0"
+                      title="Delete message"
+                    >
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <path d="M10 11v6M14 11v6" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
-
                 <span className="text-[10px] text-[#4e5668] px-1">
                   {m.createdAt ? formatTime(m.createdAt) : ""}
+                  {isDeleted && <span className="ml-1"> - deleted</span>}
                 </span>
               </div>
             </div>
-          )
+          );
         })}
 
         {isTyping && (
           <div className="flex gap-2.5 items-end">
             <div className="w-7 h-7 rounded-lg bg-[#1a1e25] shrink-0 flex items-center justify-center">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4e5668" strokeWidth="2">
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#4e5668"
+                strokeWidth="2"
+              >
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-[11px] text-[#4e5668] px-1 italic">{isTyping} is typing...</span>
+              <span className="text-[11px] text-[#4e5668] px-1 italic">
+                {isTyping} is typing...
+              </span>
               <div className="bg-[#1e2330] px-4 py-2.5 rounded-2xl rounded-bl-sm flex gap-1 items-center">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#4e5668] animate-bounce [animation-delay:0ms]" />
                 <span className="w-1.5 h-1.5 rounded-full bg-[#4e5668] animate-bounce [animation-delay:150ms]" />
@@ -226,10 +316,7 @@ export function Chat({ roomId, currentUserId }: ChatProps) {
             className="flex-1 bg-transparent border-none outline-none text-[13.5px] text-[#eef0f4] placeholder:text-[#4e5668] py-1.5"
             placeholder={`Message #${roomName || roomId}`}
             value={input}
-            onChange={(e) => {
-              setInput(e.target.value)
-              socket.emit("typing", { roomId })
-            }}
+            onChange={handleTyping}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
           />
 
@@ -238,7 +325,14 @@ export function Chat({ roomId, currentUserId }: ChatProps) {
             disabled={!input.trim()}
             className="w-8 h-8 rounded-lg bg-[#e8ff47] text-[#0d0f12] flex items-center justify-center hover:bg-[#d4eb3a] disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95 shrink-0"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
               <line x1="22" y1="2" x2="11" y2="13" />
               <polygon points="22 2 15 22 11 13 2 9 22 2" />
             </svg>
@@ -249,6 +343,5 @@ export function Chat({ roomId, currentUserId }: ChatProps) {
         </p>
       </div>
     </div>
-  )
-
+  );
 }

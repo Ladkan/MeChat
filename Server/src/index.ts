@@ -20,7 +20,7 @@ const io = new Server(httpServer, {
 const corsOptions = {
     origin: "http://localhost:5173",
     credentials: true,               
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
 };
 
@@ -49,7 +49,7 @@ app.post("/api/rooms", async (req, res) => {
         return res.status(400).json({ error: "Room name is required" })
 
     const userExisting = await db.select().from(room).where(eq(room.creatorId, session.user.id))
-    if(userExisting) return res.status(409).json({ error: "User already created room" })
+    if(userExisting.length !== 0) return res.status(409).json({ error: "User already created room" })
 
     const existing = await db.select().from(room).where(eq(room.name, name))
     console.log(existing)
@@ -87,19 +87,40 @@ app.get("/api/rooms/:roomId/messages", async (req, res) => {
         userId: message.userId,
         content: message.content,
         createdAt: message.createdAt,
+        deletedAt: message.deletedAt ?? null,
         sender: user.name
     }).from(message)
         .innerJoin(user, eq(message.userId, user.id))
         .where(eq(message.roomId, req.params.roomId))
         .orderBy(message.createdAt)
 
-    // const messages = await db.query.message.findMany({
-    //     where: eq(message.roomId, req.params.roomId),
-    //     with: { user: { columns: {name: true} } },
-    //     orderBy: (m, {asc}) => [asc(m.createdAt)],
-    // })
-
     res.json(messages)
+})
+
+app.patch("/api/messages/:messageId", async (req, res) => {
+    const session = await auth.api.getSession({ headers: req.headers as any })
+    if(!session) return res.status(401).json({ error: "Unauthorized" })
+
+    const { messageId } = req.params;
+
+    const existing = await db.query.message.findFirst({
+        where: eq(message.id, messageId)
+    })
+
+    if(!existing) return res.status(404).json({ error: "Message not found" })
+
+    if(existing.userId !== session.user.id)
+        return res.status(403).json({ error: "Forbidden" })
+
+
+        await db.update(message).set({ content: "[Deleted by user]", deletedAt: new Date() }).where(eq(message.id, messageId))
+
+    io.to(existing.roomId).emit("message_deleted", {
+        messageId,
+        roomId: existing.roomId,
+    })
+
+    res.json({ success: true })
 })
 
 io.use(async (socket, next) => {
@@ -149,6 +170,10 @@ io.on("connection", (socket) => {
     socket.on("typing", ({ roomId }: { roomId: string }) => {
         socket.to(roomId).emit("user_typing", {name: user.name})
     })
+
+    socket.on("leave_room", (roomId: string) => {
+        socket.leave(roomId);
+    });
 
 })
 

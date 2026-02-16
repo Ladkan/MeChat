@@ -22,6 +22,7 @@ CREATE TABLE `message` (
 	`room_id` text NOT NULL,
 	`user_id` text NOT NULL,
 	`created_at` integer NOT NULL,
+	`deleted_at` integer,
 	FOREIGN KEY (`room_id`) REFERENCES `room`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE cascade
 );

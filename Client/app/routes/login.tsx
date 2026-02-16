@@ -4,7 +4,7 @@ import { authClient, signIn } from "../lib/auth-client";
 
 export async function clientLoader() {
   const session = await authClient.getSession();
-  if (session.data) throw redirect("/chat");
+  if (session.data) throw redirect("/");
   return null;
 }
 
@@ -18,7 +18,7 @@ export default function Login() {
     e.preventDefault();
     const { error } = await signIn.email({ email, password });
     if (error) setError(error.message ?? "Login failed");
-    else navigate("/chat");
+    else navigate("/");
   };
 
   return (

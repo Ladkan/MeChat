@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react"
 
+interface RoomsProps {
+  activeRoomId: string | null;
+  onRoomSelect: (roomId: string) => void;
+}
+
 type Room = {
     id: string;
     creatorId: string;
@@ -7,7 +12,7 @@ type Room = {
     createdAt: number;
 }
 
-export function Rooms(){
+export function Rooms({ activeRoomId, onRoomSelect }: RoomsProps){
 
     const [rooms, setRooms] = useState<Room[]>([])
 
@@ -28,8 +33,11 @@ export function Rooms(){
                 {rooms.map((r) => (
                     <div className="flex items-center py-2 px-2.5 rounded-lg cursor-pointer"> 
                         <div className="flex-1 min-w-0">
-                            <div className="text-xs text-[#eef0f4] overflow-hidden items-center flex">
-                                {r.name}
+                            <div 
+                            className="text-xs text-[#eef0f4] overflow-hidden items-center flex"
+                            onClick={() => onRoomSelect(r.id)}
+                            >
+                                #{r.name}
                             </div>
                         </div>
                     </div>

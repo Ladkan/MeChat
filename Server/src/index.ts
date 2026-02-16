@@ -39,6 +39,35 @@ app.get("/api/rooms", async (req, res) => {
     res.json(rooms)
 })
 
+app.post("/api/rooms", async (req, res) => {
+    const session = await auth.api.getSession({ headers: req.headers as any })
+    if(!session) return res.status(401).json({ error: "Unauthorized" })
+
+    const { name } = req.body
+
+    if(!name)
+        return res.status(400).json({ error: "Room name is required" })
+
+    const userExisting = await db.select().from(room).where(eq(room.creatorId, session.user.id))
+    if(userExisting) return res.status(409).json({ error: "User already created room" })
+
+    const existing = await db.select().from(room).where(eq(room.name, name))
+    console.log(existing)
+    if(existing.length !== 0) return res.status(409).json({ error: "Room already exists" })
+
+    const newRoom = {
+        id: crypto.randomUUID(),
+        creatorId: session.user.id,
+        name,
+        createdAt: new Date,
+    }
+
+    await db.insert(room).values(newRoom)
+
+    res.status(201).json(newRoom)
+
+})
+
 app.get("/api/rooms/:roomId", async (req, res) =>{
     const session = await auth.api.getSession({ headers: req.headers as any })
     if(!session) return res.status(401).json({ error: "Unauthorized" })

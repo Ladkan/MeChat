@@ -3,6 +3,10 @@ import { useNavigate } from "react-router";
 import { useSession } from "~/lib/auth-client";
 import { socket } from "~/lib/socket";
 
+interface ChatProps {
+  roomId: string | null;
+}
+
 type Message = {
     id: string;
     sender: string;
@@ -17,10 +21,7 @@ type Room = {
     createdAt: number;
 }
 
-const ROOM_ID = "Fc5Oh7BohRDSTMEXGIGYA91BLOXSctCB";
-
-export function Chat(){
-    const { data: session } = useSession();
+export function Chat({ roomId }: ChatProps){
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [isTyping, setIsTyping] = useState<string | null>(null);
@@ -28,22 +29,25 @@ export function Chat(){
     const [room, setRoom] = useState<Room>()
 
         useEffect(() => {
-          // Connect socket and join room once component mounts
+
+          if(!roomId) return
+
+          setMessages([]);
+
           socket.connect();
           
           socket.on("connect", () =>{
-            socket.emit("join_room", ROOM_ID);
+            socket.emit("join_room", roomId);
           })
           
-          fetch(`http://localhost:8000/api/rooms/${ROOM_ID}`, {
+          fetch(`http://localhost:8000/api/rooms/${roomId}`, {
             credentials: "include"
           })
             .then((r) => r.json())
             .then((data) => setRoom(data))
             
 
-          // Load message history
-          fetch(`http://localhost:8000/api/rooms/${ROOM_ID}/messages`, {
+          fetch(`http://localhost:8000/api/rooms/${roomId}/messages`, {
             credentials: "include",
           })
             .then((r) => r.json())
@@ -63,9 +67,8 @@ export function Chat(){
             socket.off("user_typing");
             socket.disconnect();
           };
-        }, [ROOM_ID]);
+        }, [roomId]);
     
-        // Auto-scroll to latest message
         useEffect(() => {
           bottomRef.current?.scrollIntoView({ behavior: "smooth" });
         }, [messages]);
@@ -75,13 +78,13 @@ export function Chat(){
     
           console.log("Socket connected:", socket.connected);
     
-          socket.emit("send_message", { roomId: ROOM_ID, content: input });
+          socket.emit("send_message", { roomId: roomId, content: input });
           setInput("");
         };
     
         const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
           setInput(e.target.value);
-          socket.emit("typing", { roomId: ROOM_ID });
+          socket.emit("typing", { roomId: roomId });
         };
     
     return(
@@ -99,6 +102,14 @@ export function Chat(){
           ))}
           {isTyping && <p><i>{isTyping} is typing...</i></p>}
           <div ref={bottomRef} />
+
+                  <input
+          value={input}
+          onChange={handleTyping}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+          placeholder="Type a message..."
+        />
+        <button onClick={sendMessage}>Send</button>
         </div>
         </div>
     )

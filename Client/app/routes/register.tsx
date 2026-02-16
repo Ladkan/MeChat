@@ -15,10 +15,10 @@ export default function Register() {
       name,
       email,
       password,
-      callbackURL: "/chat",
+      callbackURL: "/",
     });
     if (error) setError(error.message ?? "Registration failed");
-    else navigate("/chat");
+    else navigate("/");
   };
 
   return (

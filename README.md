@@ -179,6 +179,9 @@ The client will be running at `http://localhost:5173`.
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/rooms/:roomId/messages` | Fetch message history for a room (auth required) |
+| `GET` | `/api/rooms/:roomId` | Fetch room details (auth required) |
+| `GET` | `/api/rooms` | Fetch all rooms (auth required) |
+| `POST` | `/api/rooms` | Create new room (auth required) |
 
 ### Socket.io events
 

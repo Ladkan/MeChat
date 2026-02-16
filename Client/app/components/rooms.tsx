@@ -6,43 +6,66 @@ interface RoomsProps {
 }
 
 type Room = {
-    id: string;
-    creatorId: string;
-    name: string;
-    createdAt: number;
+  id: string;
+  creatorId: string;
+  name: string;
+  createdAt: number;
 }
 
-export function Rooms({ activeRoomId, onRoomSelect }: RoomsProps){
+export function Rooms({ activeRoomId, onRoomSelect }: RoomsProps) {
+  const [rooms, setRooms] = useState<Room[]>([])
 
-    const [rooms, setRooms] = useState<Room[]>([])
+  useEffect(() => {
+    fetch("http://localhost:8000/api/rooms", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => setRooms(data))
+  }, [])
 
-    useEffect(() => {
-        fetch("http://localhost:8000/api/rooms", {credentials: "include"})
-            .then((r) => r.json())
-            .then((data) => setRooms(data))
-    },[])
+  return (
+    <aside className="w-64 shrink-0 flex flex-col bg-[#13161b] border border-[#232830] rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[#4e5668]">
+          Rooms
+        </span>
+      </div>
 
-    return(
-        <div className="w-65.5 shrink-0 bg-[#13161b] rounded-2xl border border-solid flex border-[#232830] overflow-x-hidden">
-            <div className="pt-3.5 px-3.5 pb-2.5 border-b border-solid border-b-[#232830] flex flex-col gap-2.5">
-                <div className="flex items-center justify-between">
-                    <h1 className="font-bold text-xs text-[#4e5668]">Rooms</h1>
-                </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-1.5">
-                {rooms.map((r) => (
-                    <div className="flex items-center py-2 px-2.5 rounded-lg cursor-pointer"> 
-                        <div className="flex-1 min-w-0">
-                            <div 
-                            className="text-xs text-[#eef0f4] overflow-hidden items-center flex"
-                            onClick={() => onRoomSelect(r.id)}
-                            >
-                                #{r.name}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    )
+      <div
+        className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5
+          [&::-webkit-scrollbar]:w-0.75
+          [&::-webkit-scrollbar-thumb]:bg-[#232830]
+          [&::-webkit-scrollbar-thumb]:rounded-full"
+      >
+        {rooms.length === 0 && (
+          <p className="text-xs text-[#4e5668] text-center py-6 px-4">
+            No rooms yet — create one!
+          </p>
+        )}
+        {rooms.map((room) => {
+          const isActive = room.id === activeRoomId
+          return (
+            <button
+              key={room.id}
+              onClick={() => onRoomSelect(room.id)}
+              className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 relative group ${
+                isActive
+                  ? "bg-[#e8ff47]/10 text-[#eef0f4] font-semibold"
+                  : "text-[#4e5668] hover:bg-[#1a1e25] hover:text-[#a0a8b8]"
+              }`}
+            >
+              {isActive && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.75 h-4 bg-[#e8ff47] rounded-r-full" />
+              )}
+              <span
+                className={`font-bold text-[13px] ${isActive ? "text-[#e8ff47]" : "text-[#4e5668] group-hover:text-[#4e5668]"}`}
+              >
+                #
+              </span>
+              <span className="truncate">{room.name}</span>
+            </button>
+          )
+        })}
+      </div>
+    </aside>
+  )
+
 }

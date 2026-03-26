@@ -1,24 +1,21 @@
 import { useEffect, useState } from "react"
+import { socket } from "~/lib/socket";
+import type { Room } from "~/utils/types";
 
 interface RoomsProps {
   activeRoomId: string | null;
   onRoomSelect: (roomId: string) => void;
+  rooms: Room[];
+  setRooms: React.Dispatch<React.SetStateAction<Room[]>>;
 }
 
-type Room = {
-  id: string;
-  creatorId: string;
-  name: string;
-  createdAt: number;
-}
-
-export function Rooms({ activeRoomId, onRoomSelect }: RoomsProps) {
-  const [rooms, setRooms] = useState<Room[]>([])
+export function Rooms({ activeRoomId, onRoomSelect, rooms, setRooms }: RoomsProps) {
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/rooms", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => setRooms(data))
+    socket.on("room_created", (newRoom: Room) => {
+      setRooms((prev) => prev.find((r) => r.id === newRoom.id) ? prev : [...prev, newRoom])
+    })
+    return () => { socket.off("room_created") }
   }, [])
 
   return (

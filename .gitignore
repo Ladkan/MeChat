@@ -11,12 +11,13 @@ Client/node_modules
 Server/node_modules
 Server/.env
 Client/.env
-Server/chat.db
 node_modules
 Server/dist
 Client/dist
 Client/dist-ssr
 Client/.react-router
+Server/src/bot
+Save
 
 # Editor directories and files
 .vscode/*

@@ -10,6 +10,7 @@ export const user = sqliteTable("user", {
     .default(false)
     .notNull(),
   image: text("image"),
+  isBot: integer("is_bot", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
     .notNull(),
@@ -106,11 +107,48 @@ export const message = sqliteTable("message", {
     deletedAt: integer("deleted_at", {mode: "timestamp"}),
 })
 
+export const auditlog = sqliteTable("audit_log", {
+  id: text("id").primaryKey(),
+  level: text("level", { enum: ["info", "warn", "error"] }).notNull(),
+  category: text("category", { enum: ["auth", "bot", "room", "message", "socket", "server"], }).notNull(), 
+  action: text("action").notNull(),    
+  userId: text("user_id"),            
+  meta: text("meta"),                  
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+},
+(table) => [index("auditlog_userId_idx").on(table.userId)]
+)
+
+export const notification = sqliteTable("notification", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  roomId: text("room_id").notNull().references(() => room.id, { onDelete: "cascade" }),
+  messageId: text("message_id").notNull().references(() => message.id, { onDelete: "cascade" }),
+  mentionedBy: text("mentioned_by").notNull(), 
+  read: integer("read", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+})
+
+
 export const userRelations = relations(user, ({ many }) => ({
   messages: many(message),
   sessions: many(session),
   accounts: many(account),
+  auditlogs: many(auditlog),
 }));
+
+export const notificationRelations = relations(notification, ({ one }) => ({
+  user: one(user, { fields: [notification.userId], references: [user.id] }),
+  room: one(room, { fields: [notification.roomId], references: [room.id] }),
+  message: one(message, { fields: [notification.messageId], references: [message.id] }),
+}))
+
+export const auditlogRelations = relations(auditlog, ({one}) => ({
+  user: one(user, {
+    fields: [auditlog.userId],
+    references: [user.id],
+  })
+}))
 
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, {

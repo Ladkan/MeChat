@@ -1,27 +1,45 @@
-import { useState } from "react"
+import { useReducer, useState } from "react"
 import { useNavigate, Link } from "react-router"
 import { signUp } from "../lib/auth-client"
 
+type State = {
+  name: string;
+  email: string;
+  password: string;
+  error: string;
+  loading: boolean;
+}
+
+const initialState: State = {
+  email: "",
+  name: "",
+  password: "",
+  error: "",
+  loading: false
+}
+
+function reducer(state: State, action: Partial<State>): State {
+  return { ...state, ...action };
+}
+
 export default function Register() {
   const navigate = useNavigate()
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  const { email, error, loading, name, password } = state
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError("")
+    dispatch({ loading: true })
+    dispatch({ error: "" })
     const { error } = await signUp.email({
       name,
       email,
       password,
       callbackURL: "/",
     })
-    setLoading(false)
-    if (error) setError(error.message ?? "Registration failed")
+    dispatch({ loading: false })
+    if (error) dispatch({ error: error.message ?? "Registration failed" })
     else navigate("/")
   }
 
@@ -81,42 +99,45 @@ export default function Register() {
             )}
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-widest text-[#4e5668]">
+              <label htmlFor="name" className="text-[11px] font-bold uppercase tracking-widest text-[#4e5668]">
                 Display Name
               </label>
               <input
+                id="name"
                 type="text"
                 placeholder="Alex Johnson"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => dispatch({ name: e.target.value })}
                 required
                 className="bg-[#13161b] border border-[#232830] focus:border-[#e8ff47]/40 rounded-xl px-4 py-3 text-sm text-[#eef0f4] placeholder:text-[#4e5668] outline-none transition-colors"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-widest text-[#4e5668]">
+              <label htmlFor="email" className="text-[11px] font-bold uppercase tracking-widest text-[#4e5668]">
                 Email
               </label>
               <input
+                id="email"
                 type="email"
                 placeholder="you@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => dispatch({ email: e.target.value })}
                 required
                 className="bg-[#13161b] border border-[#232830] focus:border-[#e8ff47]/40 rounded-xl px-4 py-3 text-sm text-[#eef0f4] placeholder:text-[#4e5668] outline-none transition-colors"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-widest text-[#4e5668]">
+              <label htmlFor="password" className="text-[11px] font-bold uppercase tracking-widest text-[#4e5668]">
                 Password
               </label>
               <input
+                id="password"
                 type="password"
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => dispatch({ password: e.target.value })}
                 required
                 className="bg-[#13161b] border border-[#232830] focus:border-[#e8ff47]/40 rounded-xl px-4 py-3 text-sm text-[#eef0f4] placeholder:text-[#4e5668] outline-none transition-colors"
               />

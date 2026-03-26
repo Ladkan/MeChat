@@ -71,10 +71,11 @@ export default function Login() {
             )}
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-widest text-[#4e5668]">
+              <label htmlFor="email" className="text-[11px] font-bold uppercase tracking-widest text-[#4e5668]">
                 Email
               </label>
               <input
+                id="email"
                 type="email"
                 placeholder="you@example.com"
                 value={email}
@@ -85,10 +86,11 @@ export default function Login() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-widest text-[#4e5668]">
+              <label htmlFor="password" className="text-[11px] font-bold uppercase tracking-widest text-[#4e5668]">
                 Password
               </label>
               <input
+                id="password"
                 type="password"
                 placeholder="••••••••"
                 value={password}
